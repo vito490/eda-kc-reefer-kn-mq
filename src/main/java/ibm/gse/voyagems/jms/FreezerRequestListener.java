@@ -36,18 +36,7 @@ public class FreezerRequestListener implements Runnable {
     @Inject
     JMSQueueWriter<EventBase> jmsQueueWriter;
 
-
-    private final ExecutorService scheduler = Executors.newSingleThreadExecutor();
-
     private static final Logger log = Logger.getLogger(FreezerRequestListener.class);
-
-    void onStart(@Observes StartupEvent ev) {
-        scheduler.submit(this);
-    }
-
-    void onStop(@Observes ShutdownEvent ev) {
-        scheduler.shutdown();
-    }
 
     @Override
     public void run() {

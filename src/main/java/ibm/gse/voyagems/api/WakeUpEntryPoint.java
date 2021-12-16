@@ -16,9 +16,11 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @ApplicationScoped
-@Path("/api/v1/orders")
+@Path("/")
 @Produces(MediaType.APPLICATION_JSON)
 public class WakeUpEntryPoint {
 
@@ -27,15 +29,31 @@ public class WakeUpEntryPoint {
     @Inject
     FreezerRequestListener freezerRequestListener;
 
+    private ExecutorService scheduler;
+
     public WakeUpEntryPoint() { }
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Operation(summary = "Request to create an order", description = "")
     @APIResponses(value = {
-            @APIResponse(responseCode = "400", description = "Function could not wake up", content = @Content(mediaType = "application/json")),
+            @APIResponse(responseCode = "500", description = "Function could not wake up", content = @Content(mediaType = "application/json")),
             @APIResponse(responseCode = "200", description = "Function waked up", content = @Content(mediaType = "application/json")) })
-    public Response createShippingOrder(String createOrderParameters) throws Exception {
+    public Response createShippingOrder() {
+
+        try {
+            if(scheduler != null) {
+                logger.info("Consumer already scheduled");
+                return Response.ok().build();
+            }
+            scheduler = Executors.newSingleThreadExecutor();
+            scheduler.submit(freezerRequestListener);
+            logger.info("Refeer consumer scehduled..");
+            return Response.ok().build();
+        } catch (Exception e) {
+            logger.error("Could not schedule consumer..", e);
+            return Response.serverError().build();
+        }
 
     }
 }
