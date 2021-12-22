@@ -18,6 +18,7 @@ import javax.jms.ConnectionFactory;
 import javax.jms.JMSConsumer;
 import javax.jms.JMSContext;
 import javax.jms.JMSException;
+import javax.jms.JMSProducer;
 import javax.jms.Message;
 import javax.jms.Session;
 import java.util.UUID;
@@ -36,35 +37,47 @@ public class FreezerRequestListener implements Runnable {
     @Inject
     JMSQueueWriter<EventBase> jmsQueueWriter;
 
+    private final ObjectMapper mapper = new ObjectMapper();
+
     private static final Logger log = Logger.getLogger(FreezerRequestListener.class);
+
+    JMSContext context;
 
     @Override
     public void run() {
         log.info("Connecting to message queue" + System.getenv("FREEZER_REQUEST_QUEUE"));
-        try (JMSContext context = connectionFactory.createContext(Session.AUTO_ACKNOWLEDGE)) {
+        try ( JMSContext context = connectionFactory.createContext(Session.CLIENT_ACKNOWLEDGE)) {
+
+            this.context = context;
             JMSConsumer consumer = context.createConsumer(
                     context.createQueue(System.getenv("FREEZER_REQUEST_QUEUE")));
+            JMSProducer producer = context.createProducer();
+
             while (true) {
                 Message message = consumer.receive();
                 if (message == null) {
                     return;
                 }
                 log.info("received message from queue... " + message.getBody(String.class));
-                processMessage(message.getBody(String.class));
+                EventBase processedMessage = processMessage(message.getBody(String.class));
+
+                producer.send(context.createQueue(System.getenv("FREEZER_RESPONSE_QUEUE")),
+                        mapper.writeValueAsString(processedMessage));
+
+                message.acknowledge();
             }
-        } catch (JMSException e) {
-            log.error("error parsing message..", e);
+        } catch (Exception e) {
+            log.error("error processing message, rolling back..", e);
         }
     }
 
-    public void processMessage(String rawMessageBody) {
+    public EventBase processMessage(String rawMessageBody) {
 
         try {
 
             ObjectMapper mapper = new ObjectMapper();
             log.debug("received message from queue... " + rawMessageBody);
             JsonObject rawEvent = new JsonObject(rawMessageBody);
-            EventBase responseEvent = null;
             if (rawEvent.getString("type").equals(EventBase.TYPE_VOYAGE_ASSIGNED)) {
 
                 UUID freezerId = UUID.randomUUID();
@@ -72,7 +85,7 @@ public class FreezerRequestListener implements Runnable {
                 String orederId = rawEvent.getJsonObject("payload").getString("orderID");
                 FreezerAllocatedPayload freezerAllocatedPayload =
                         new FreezerAllocatedPayload(orederId, freezerId.toString());
-                responseEvent = new FreezerAllocatedEvent(System.currentTimeMillis(), "1.0", orederId,
+                return new FreezerAllocatedEvent(System.currentTimeMillis(), "1.0", orederId,
                         freezerAllocatedPayload);
 
             } else if(rawEvent.getString("type").equals(EventBase.TYPE_VOYAGE_NOT_FOUND)) {
@@ -81,15 +94,15 @@ public class FreezerRequestListener implements Runnable {
 
                 FreezerNotFoundPayload freezerNotFoundPayload = new FreezerNotFoundPayload(orederId,
                         "Voyage not found, rolling back container schedule");
-                responseEvent = new FreezerNotFoundEvent(System.currentTimeMillis(), "1.0",
+                return new FreezerNotFoundEvent(System.currentTimeMillis(), "1.0",
                         orederId, freezerNotFoundPayload);
 
+            } else {
+                throw new RuntimeException("Could not verify payload type");
             }
-
-            jmsQueueWriter.sendMessage(responseEvent, System.getenv("FREEZER_RESPONSE_QUEUE"));
-
         } catch (Exception e) {
             log.error("error processing message...", e);
+            throw e;
         }
     }
 }
