@@ -2,7 +2,9 @@ package ibm.gse.voyagems.domain.model.freezer;
 
 
 import ibm.gse.voyagems.domain.model.EventBase;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 
+@RegisterForReflection
 public class FreezerAllocatedEvent extends EventBase {
 
 	private String orderID;
