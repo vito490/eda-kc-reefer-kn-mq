@@ -37,37 +37,46 @@ public class FreezerRequestListener implements Runnable {
     @Inject
     JMSQueueWriter<EventBase> jmsQueueWriter;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+
+    private final ExecutorService scheduler = Executors.newSingleThreadExecutor();
 
     private static final Logger log = Logger.getLogger(FreezerRequestListener.class);
 
-    JMSContext context;
+    void onStart(@Observes StartupEvent ev) {
+        scheduler.submit(this);
+    }
+
+    void onStop(@Observes ShutdownEvent ev) {
+        scheduler.shutdown();
+    }
 
     @Override
     public void run() {
-        log.info("Connecting to message queue" + System.getenv("FREEZER_REQUEST_QUEUE"));
-        try ( JMSContext context = connectionFactory.createContext(Session.CLIENT_ACKNOWLEDGE)) {
-
-            this.context = context;
-            JMSConsumer consumer = context.createConsumer(
+        log.info("Connecting to message queue " + System.getenv("FREEZER_REQUEST_QUEUE"));
+        try (JMSContext context = connectionFactory.createContext(Session.CLIENT_ACKNOWLEDGE)) {
+            javax.jms.JMSConsumer consumer = context.createConsumer(
                     context.createQueue(System.getenv("FREEZER_REQUEST_QUEUE")));
-            JMSProducer producer = context.createProducer();
-
             while (true) {
                 Message message = consumer.receive();
                 if (message == null) {
                     return;
                 }
                 log.info("received message from queue... " + message.getBody(String.class));
-                EventBase processedMessage = processMessage(message.getBody(String.class));
+                EventBase responseEvent = processMessage(message.getBody(String.class));
+                boolean messageSent = false;
+                try {
+                    messageSent = jmsQueueWriter.sendMessage(responseEvent, System.getenv("FREEZER_RESPONSE_QUEUE"));
+                } catch (Exception e) {
+                    log.error("Could not send response message, rolling back...", e);
+                    //TODO: ROLLBACK LOGIC TO BE IMPLEMENTED
 
-                producer.send(context.createQueue(System.getenv("FREEZER_RESPONSE_QUEUE")),
-                        mapper.writeValueAsString(processedMessage));
-
-                message.acknowledge();
+                }
+                if(messageSent) {
+                    message.acknowledge();
+                }
             }
         } catch (Exception e) {
-            log.error("error processing message, rolling back..", e);
+            log.error("error parsing message..", e);
         }
     }
 

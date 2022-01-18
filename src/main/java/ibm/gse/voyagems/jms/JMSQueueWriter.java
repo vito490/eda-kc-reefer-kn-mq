@@ -24,14 +24,15 @@ public class JMSQueueWriter<T> {
 
     private static final Logger logger = LoggerFactory.getLogger(JMSQueueWriter.class);
 
-    public void sendMessage(final T message, final String queueName) throws Exception {
+    public boolean sendMessage(final T message, final String queueName) throws Exception {
         try (JMSContext context = connectionFactory.createContext(Session.AUTO_ACKNOWLEDGE)) {
             context.createProducer().send(
                     context.createQueue(queueName), mapper.writeValueAsString(message));
             logger.info("Message sent on queue " + queueName);
+            return true;
         } catch (Exception e) {
             logger.error("MANAGE ME", e);
-            throw e;
+            return false;
         }
     }
 }
