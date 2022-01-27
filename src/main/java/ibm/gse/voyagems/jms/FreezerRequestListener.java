@@ -1,6 +1,5 @@
 package ibm.gse.voyagems.jms;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import ibm.gse.voyagems.domain.model.EventBase;
 import ibm.gse.voyagems.domain.model.freezer.FreezerAllocatedEvent;
 import ibm.gse.voyagems.domain.model.freezer.FreezerAllocatedPayload;
