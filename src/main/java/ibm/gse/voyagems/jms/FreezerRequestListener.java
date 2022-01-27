@@ -74,8 +74,6 @@ public class FreezerRequestListener implements Runnable {
     public EventBase processMessage(String rawMessageBody) {
 
         try {
-
-            ObjectMapper mapper = new ObjectMapper();
             log.debug("received message from queue... " + rawMessageBody);
             JsonObject rawEvent = new JsonObject(rawMessageBody);
             if (rawEvent.getString("type").equals(EventBase.TYPE_VOYAGE_ASSIGNED)) {
