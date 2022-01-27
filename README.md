@@ -1,0 +1,1 @@
+# Freezer manager as Knative eventing

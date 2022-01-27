@@ -78,8 +78,6 @@ public class FreezerRequestListener implements Runnable {
     public EventBase processMessage(String rawMessageBody) throws InterruptedException {
 
         try {
-
-            ObjectMapper mapper = new ObjectMapper();
             log.debug("received message from queue... " + rawMessageBody);
             JsonObject rawEvent = new JsonObject(rawMessageBody);
 
