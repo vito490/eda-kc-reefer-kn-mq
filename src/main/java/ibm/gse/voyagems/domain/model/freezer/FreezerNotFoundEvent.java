@@ -7,7 +7,6 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 @RegisterForReflection
 public class FreezerNotFoundEvent extends EventBase {
 
-	private String orderID;
 	private FreezerNotFoundPayload payload;
 
 	public FreezerNotFoundEvent(long timestampMillis, String version, String orderID, FreezerNotFoundPayload payload) {
@@ -15,7 +14,6 @@ public class FreezerNotFoundEvent extends EventBase {
     	this.version = version;
     	this.type = EventBase.TYPE_CONTAINER_NOT_FOUND;
 		this.payload = payload;
-		this.orderID = orderID;
 	}
 
 	public FreezerNotFoundEvent() {
@@ -31,8 +29,5 @@ public class FreezerNotFoundEvent extends EventBase {
 		this.payload = payload;
 	}
 	
-	public String getOrderId() {
-		return orderID;
-	}
-	
+
 }

@@ -15,10 +15,7 @@ import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.event.Observes;
 import javax.inject.Inject;
 import javax.jms.ConnectionFactory;
-import javax.jms.JMSConsumer;
 import javax.jms.JMSContext;
-import javax.jms.JMSException;
-import javax.jms.JMSProducer;
 import javax.jms.Message;
 import javax.jms.Session;
 import java.util.UUID;
@@ -68,8 +65,6 @@ public class FreezerRequestListener implements Runnable {
                     messageSent = jmsQueueWriter.sendMessage(responseEvent, System.getenv("FREEZER_RESPONSE_QUEUE"));
                 } catch (Exception e) {
                     log.error("Could not send response message, rolling back...", e);
-                    //TODO: ROLLBACK LOGIC TO BE IMPLEMENTED
-
                 }
                 if(messageSent) {
                     message.acknowledge();
@@ -80,14 +75,32 @@ public class FreezerRequestListener implements Runnable {
         }
     }
 
-    public EventBase processMessage(String rawMessageBody) {
+    public EventBase processMessage(String rawMessageBody) throws InterruptedException {
 
         try {
 
             ObjectMapper mapper = new ObjectMapper();
             log.debug("received message from queue... " + rawMessageBody);
             JsonObject rawEvent = new JsonObject(rawMessageBody);
+
+            String productId = null;
+            if((productId = rawEvent.getJsonObject("payload").getString("productId")) != null) {
+                if(productId.equals("REFEER_FAILS")) {
+
+                    Thread.sleep(3000);
+
+                    String orederId = rawEvent.getJsonObject("payload").getString("orderID");
+
+                    FreezerNotFoundPayload freezerNotFoundPayload = new FreezerNotFoundPayload(orederId,
+                            "Container not found");
+                    return new FreezerNotFoundEvent(System.currentTimeMillis(), "1.0",
+                            orederId, freezerNotFoundPayload);
+                }
+            }
+
             if (rawEvent.getString("type").equals(EventBase.TYPE_VOYAGE_ASSIGNED)) {
+
+                Thread.sleep(3000);
 
                 UUID freezerId = UUID.randomUUID();
                 log.debug("Generated new voyage ID: " + freezerId);
@@ -98,6 +111,8 @@ public class FreezerRequestListener implements Runnable {
                         freezerAllocatedPayload);
 
             } else if(rawEvent.getString("type").equals(EventBase.TYPE_VOYAGE_NOT_FOUND)) {
+
+                Thread.sleep(3000);
 
                 String orederId = rawEvent.getJsonObject("payload").getString("orderID");
 
